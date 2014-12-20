@@ -1,0 +1,16 @@
+# Site settings
+title: Steven A W Cordwell
+email: steve.cordwell@gmail.com
+description: >
+  Ecology, conservation biology and operations research.
+baseurl: "" # the subpath of your site, e.g. /blog/
+url: "http://sawcordwell.github.io"
+twitter_username: s1cordwell
+github_username: sawcordwell
+
+exclude: ["README.md"]
+future: false
+permalink: pretty
+
+# Build settings
+markdown: kramdown
