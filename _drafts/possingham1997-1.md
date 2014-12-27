@@ -1,8 +1,11 @@
-.. 04_possingham1997:
+---
+layout: post
+title: "Optimal fire management of a threatened species: Python MDP Toolbox worked example"
+date: 2015-01-10 15:00:00
+categories: mdp conservation
+tags: [MDP, Python, Markov, decision]
+---
 
-==================================================================================
-Optimal fire management of a threatened species: Python MDP Toolbox worked example
-==================================================================================
 The [Possingham-and-Tuck-1997]_ was among the first to `apply Markov decision theory to a conservation biology problem <http://www.mssanz.org.au/MODSIM97/Vol 2/Possingham.pdf>`_.
 Here I will follow their paper and replicate their results as a worked example of how to use PyMDPtoolbox, a `Markov decison process (MDP) toolbox <http://www.inra.fr/mia/T/MDPtoolbox/>`_ for Python.
 For an introduction to MDPs see `Marescot et al (2013) <http://dx.doi.org/10.1111/2041-210X.12082>`_.
@@ -19,7 +22,7 @@ In a follow-up post, I will extend it to include the extra complexity of spatial
 The simplest aspect of the problem defined in the paper was how habitat suitability relates to the number of years since the last fire in a patch.
 Figure 2 (of the paper) shows the relationship, and the equivalent Python code is as follows:
 
-.. code-block:: python
+{% highlight python %}
 
     def getHabitatSuitability(years):
         """The habitat suitability of a patch relatve to the time since last fire.
@@ -46,6 +49,8 @@ Figure 2 (of the paper) shows the relationship, and the equivalent Python code 
             return(-0.1 * years + 1.5)
         else:
             return(0.5)
+
+{% endhighlight %}
 
 The next part of the problem is how to define the states.
 While there are a number of possible alternatives to storing the transition probabilities (such as a Python ``dict`` or a custom class), the way that PyMDPtoolbox uses them is through `NumPy <http://www.numpy.org>`_ arrays.
@@ -224,7 +229,7 @@ And now here is the function in full:
         assert 0 <= x < POPULATION_CLASSES
         assert 0 <= F < FIRE_CLASSES
         assert 0 <= s <= 1
-        assert 0 <= a < ACTIONS 
+        assert 0 <= a < ACTIONS
         prob = np.zeros((STATES,))
         r = getHabitatSuitability(F)
         # Efect of action on time in years since fire.
