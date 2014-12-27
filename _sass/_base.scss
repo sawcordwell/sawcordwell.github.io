@@ -202,3 +202,17 @@ pre {
         }
     }
 }
+
+
+/**
+ * Definiion lists
+ */
+dt {
+  clear: left;
+  float: left;
+  width: 8em;
+}
+dd {
+  margin-left: 8em;
+  margin-bottom: $spacing-unit;
+}
