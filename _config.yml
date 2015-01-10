@@ -12,6 +12,7 @@ github_username: sawcordwell
 exclude: ["README.md"]
 future: false
 permalink: pretty
+timezone: Pacific/Auckland
 
 # Build settings
 markdown: kramdown
