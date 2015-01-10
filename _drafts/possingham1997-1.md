@@ -2,16 +2,16 @@
 layout: post
 title: Optimal fire management of a threatened species, part 1
 subtitle: Python MDP Toolbox worked example
-date: 2015-01-10 15:00:00
+date: 2015-01-10 23:30:00
 categories: mdp conservation
-tags: [MDP, Python, Markovian, decision theory, toolbox, tutorial]
+tags: [MDP, Python, Markovian, decision theory, toolbox, tutorial, forest, conservation, fire]
 ---
 
 The paper by [Possingham and Tuck (1997)][poss-tuck-97] was among the first to apply Markov decision theory to a conservation biology problem.
 Here I will follow their paper and replicate their results as a worked example of how to use PyMDPtoolbox, a [Markov decison process (MDP) toolbox](<http://www.inra.fr/mia/T/MDPtoolbox/>) for Python.
 For an introduction to MDPs see [Marescot _et al_ (2013)](<http://dx.doi.org/10.1111/2041-210X.12082>).
 
-The complete source code for this tuorial is available in a [GitHub gist]().
+The complete source code for this tuorial is available in a [GitHub gist](https://gist.github.com/sawcordwell/bccdf42fcc4e024d394b).
 
 ## Setup
 
@@ -24,7 +24,7 @@ If you downloaded the zip archive then unzip it and enter the [setuptools](http:
 Now you should be able to `from mdptoolbox import mdp` in the Python console.
 
 First, we need to download the [paper][poss-tuck-97] and read through Section&nbsp;1 and Section&nbsp;2.
-Okay, now that we know what the problem is we'll start by defining the state transition probabilities.
+Okay, now that we know what the problem is we can get to work.
 In this first post I will only concetrate on setting up the problem without spatial structure.
 This means that there will only be one population.
 In a follow-up post, I will extend it to include the extra complexity of spatial structure with two populations.
@@ -39,20 +39,57 @@ from mdptoolbox import mdp
 
 Define the following constants globally, they are used to specify the dimensions of the problem.
 [Possingham and Tuck (1997)][poss-tuck-97] specifically state that there are seven population abundance classes (`POPULATION_CLASSES`), where class 0 corresponds to extinct.
-They don't specifically mention how many classes there are to represent the years since last fire, but judging by Figure&nbsp;3 there are 13 (`FIRE_CLASSES`).
+They do not specifically mention how many classes there are to represent the years since last fire, but judging by Figure&nbsp;3 there are 13 fire classes (`FIRE_CLASSES`).
 A state is made up of a population class component and a years since fire class component, so the number of states (`STATES`) is the number of both classes multiplied together.
 In Possingham and Tuck there are four actions, but since I am only considering a single population for now that means I only have two actions (`ACTIONS`).
 Action `0` is do nothing, and action `1` is burn the forest patch.
+These constants are strictly neccesary but it leaves reading the code much nicer.
 
 {% highlight python %}
 # The number of population abundance classes
 POPULATION_CLASSES = 7
-# The number of classes of years since a fire
+# The number of years since a fire classes
 FIRE_CLASSES = 13
 # The number of states
 STATES = POPULATION_CLASSES * FIRE_CLASSES
 # The number of actions
 ACTIONS = 2
+ACTION_NOTHING = 0
+ACTION_BURN = 1
+{% endhighlight %}
+
+## Input validation
+
+Next we create some functions to help validate the inputs to various functions that we will define.
+We're going to want to send the action, population class, fire class, and a probability as input to multiple functions.
+If the values do not make sense, then an exception is raised that prints a useful error message that tells you what inout was expected and what input was passed.
+
+{% highlight python %}
+def check_action(x):
+    """Check that the action is in the valid range."""
+    if not (0 <= x < ACTIONS):
+        msg = "Invalid action '%s', it should be in {0, 1}." % str(x)
+        raise ValueError(msg)
+
+def check_population_class(x):
+    """Check that the population abundance class is in the valid range."""
+    if not (0 <= x < POPULATION_CLASSES):
+        msg = "Invalid population class '%s', it should be in {0, 1, …, %d}." \
+              % (str(x), POPULATION_CLASSES - 1)
+        raise ValueError(msg)
+
+def check_fire_class(x):
+    """Check that the time in years since last fire is in the valid range."""
+    if not (0 <= x < FIRE_CLASSES):
+        msg = "Invalid fire class '%s', it should be in {0, 1, …, %d}." % \
+              (str(x), FIRE_CLASSES - 1)
+        raise ValueError(msg)
+
+def check_probability(x, name="probability"):
+    """Check that a probability is between 0 and 1."""
+    if not (0 <= x <= 1):
+        msg = "Invalid %s '%s', it must be in [0, 1]." % (name, str(x))
+        raise ValueError(msg)
 {% endhighlight %}
 
 ## Habitat suitability
@@ -71,7 +108,7 @@ def get_habitat_suitability(years):
     Parameters
     ----------
     years : int
-        Years since last fire.
+        The time in years since last fire.
 
     Returns
     -------
@@ -79,7 +116,9 @@ def get_habitat_suitability(years):
         The habitat suitability.
 
     """
-    assert years >= 0, "'years' must be a positive number"
+    if years < 0:
+        msg = "Invalid years '%s', it should be positive." % str(years)
+        raise ValueError(msg)
     if years <= 5:
         return 0.2*years
     elif 5 <= years <= 10:
@@ -88,22 +127,36 @@ def get_habitat_suitability(years):
         return 0.5
 {% endhighlight %}
 
-## States, actions and rewards
+## States, actions, transitions and rewards
 
-The next part of the problem is how to define the states and rewards.
+The next part of the problem is how to define the states, actions and rewards.
+The way that PyMDPtoolbox handles states is by indexing into matrices: each row represents a state that the system can start in, and the columns represent the states that the system can transition to.
+Index numbers refer to the same state in both rows and columns, and the value of the matrix in the element represents the transition probability.
+So for example given row 1, column 2, with a value of 0.5 then this means that the probability of transitioning to state 2 from state 1 is 0.5.
+This matrix is referred to as the _transition probability matrix_.
+There is one transition probability matrix for each action.
+So, with the value at row <math>i</math>, column <math>j</math> of matrix <math>a</math>, then we know the probability of transitioning from state <math>i</math> to state <math>j</math> given action <math>a</math> is taken.
+
 While there are a number of possible alternatives to storing transition probabilities (such as a Python `dict` or a custom class), the way that PyMDPtoolbox uses them is through [NumPy](<http://www.numpy.org>) arrays.
-The transition probability array is given the name `P` and must be specified in a certain way.
+A single array will hold all the transition information for all the actions.
+The toolbox's convention is to given the name `P` to the transition probability array, and that is what we will use here.
+
+The array needs to be specified in a certain way.
 It should have 3 dimensions, where the first dimension corresponds to the actions and the second dimension corresponds to the initial states before any transition, and the thrid dimension corresponds to the next states after any transition.
 Each element of the array stores a probability: the probability that the state of the system transitions from the initial state <math>s</math> to the next state <math>s'</math> given that action <math>a</math> was taken.
 Let the total number of actions be <math>A</math> and the total number of states be <math>S</math>, then ``P`` is going to be an array with size <math>A × S × S</math>.
 Each slice of the array along the first dimenion is an <math>S × S</math> matrix, which is the transition probability matrix for the corresponding action.
 
+The rewards are also stored as NumPy arrays.
+Briefly, rewards indicate how desirable each state is to be in, and the MDP algorithm's goal is to maximise rewards over the long run.
 The reward `R` can be either a vector of length <math>S</math> or a numpy array of size <math>S × A</math>.
-... etc...
+The difference is that you can specify rewards as a function of state, or as a function of state-action pairs, whichever suits your needs better.
+For this example, we only need to specify reward as a function of state.
 
 ### Probability transition matrices
 
-Let us look at a simple example before moving on...
+Let us look at a simple example of a transition array for a hypothetical system before moving on.
+In this example there are two states and two actions:
 
 {% highlight python %}
 P = np.array([[[0.5, 0.5],
@@ -112,12 +165,15 @@ P = np.array([[[0.5, 0.5],
                [0.1, 0.9]]])
 {% endhighlight %}
 
-... blah blah...
+Make sure you enter this into a Python session if you do not fully understand transition probabilities yet.
+`P[0]` corresponds to the transition probability matrix for action `0`, and `P[1]` for action `1`.
+If the system is in state `0` and action `0` is taken, then there is a 50% chance that the system will transition back to state `0` (i.e. stay in the same state) and a 50% chance that the system will transition to state `1`.
+If action `1` is taken instead, then the system is guaranteed to transition to state `1`.
+You will notice that each row sums to one, and this is a requirement for transition probability matrices.
 
-The indexes of the rows of a transition probability matrix are the initial states, and the elements along the rows contain the probabilities that the system will transition to the state given by the index of the columns.
-So, as we can see each state is uniquely identified by an index into the transition probability matrix.
-Therefore we need a way to translate from the human readable state specified as a set of parameters, to the machine readable form of an index and vice-versa.
-These two functions and the globally defined constants will do the trick:
+So, each state is uniquely identified by an index into the transition probability matrix, but we think of the state as a combination of the population abundance class and the number of years since the last fire.
+Therefore we need a way to translate from the human understandable state specified as a set of variables, to the machine readable form of an index and vice-versa.
+These two functions will do the trick:
 
 {% highlight python %}
 def convert_state_to_index(population, fire):
@@ -137,11 +193,9 @@ def convert_state_to_index(population, fire):
         the state parameters.
 
     """
-    assert 0 <= population < POPULATION_CLASSES, "'population' must be in " \
-        "(0, 1...%d)" % POPULATION_CLASSES - 1
-    assert 0 <= fire < FIRE_CLASSES, "'fire' must be in " \
-        "(0, 1...%d) " % FIRE_CLASSES - 1
-    return population * FIRE_CLASSES + fire
+    check_population_class(population)
+    check_fire_class(fire)
+    return population*FIRE_CLASSES + fire
 {% endhighlight %}
 
 {% highlight python %}
@@ -161,47 +215,76 @@ def convert_index_to_state(index):
         species. ``fire``, the time in years since last fire.
 
     """
-    assert 0 <= index < STATES
+    if not (0 <= index < STATES):
+        msg = "Invalid index '%s', it should be in {0, 1, …, %d}." % \
+              (str(index), STATES - 1)
+        raise ValueError(msg)
     population = index // FIRE_CLASSES
     fire = index % FIRE_CLASSES
     return (population, fire)
 {% endhighlight %}
 
-The case years since last fire component is simply described: given action do nothing, <math>a = 0</math>, the years since last fire <math>F</math> will increase by one until it has reached the largest class, after which it is absorbed into the largest class; and given action burn, <math>a = 1</math>, the years since last fire <math>F</math> will go back to zero:
+Try testing them out and find which inputs will cause an error.
 
-{% highlight python %}
-...
-if a == 0:
-    # Increase the time since the patch has been burned by one year.
-    # The years since fire in patch is absorbed into the last class
-    if F < FIRE_CLASSES - 1:
-        F += 1
-elif a == 1:
-    # When the patch is burned set the years since fire to 0.
-    F = 0
-...
-{% endhighlight %}
-
-Now we need a function that can return a row of the transition probability matrix defining all transition probabilities for a given state and action.
-But before defining the function in full, let's break it up into the component pieces.
-Note, any given transition can have a probability of zero, but each row of the transition probability matrix must sum to one; so with probability 1 any given state will transition to the next state (it can transition back to the same state).
+Now we need to move onto the logic of transitioning the states.
+We will do it so that we can calculate the transition probabilities one state at a time.
+This means that we will be filling in the transition probability matrix row by row.
+Remember, any given transition can have a probability of zero, but each row of the transition probability matrix must sum to one; so with probability 1 any given state will transition to the next state (it can transition back to the same state).
 The dynamics of the transition probabilities are given in Section 2.1 and Figure 1 of [Possingham and Tuck (1997)][poss-tuck-97].
-We will need to set up a numpy vector array to store the probabilities, and also get the habitat suitability based on the years since last fire <math>F</math>:
+We will need to set up a NumPy array to store the row of probabilities, and also get the habitat suitability based on the years since last fire <math>F</math>:
 
 {% highlight python %}
 ...
 prob = np.zeros(STATES)
-r = getHabitatSuitability(F)
+r = get_habitat_suitability(F)
 ...
 {% endhighlight %}
 
-Next is how the the abundance class will be affected.
-This is broken into three components, first when the abundance class is zero (extinct), <math>x = 0</math>, second is when it is at a maximum, <math>x = 6</math>, and third is when it is between these two extremes.
+First we work out how to transition the years since last fire.
+This is simple to describe: given action do nothing, <math>a = 0</math>, the years since last fire <math>F</math> will increase by one until it has reached the largest class, after which it is absorbed into the largest class; and given action burn, <math>a = 1</math>, the years since last fire <math>F</math> will go back to zero:
+
+{% highlight python %}
+def transition_fire_state(F, a):
+    """Transition the years since last fire based on the action taken.
+
+    Parameters
+    ----------
+    F : int
+        The time in years since last fire.
+    a : int
+        The action undertaken.
+
+    Returns
+    -------
+    F : int
+        The time in years since last fire.
+
+    """
+    ## Efect of action on time in years since fire.
+    if a == ACTION_NOTHING:
+        # Increase the time since the patch has been burned by one year.
+        # The years since fire in patch is absorbed into the last class
+        if F < FIRE_CLASSES - 1:
+            F += 1
+    elif a == ACTION_BURN:
+        # When the patch is burned set the years since fire to 0.
+        F = 0
+
+    return F
+{% endhighlight %}
+
+Now we need work out how the transitions of the population abundance should work.
+This is broken into three components:
+
+1. When the abundance class is zero (extinct), <math>x = 0</math>;
+2. When the abundance class is at its maximum, <math>x = 6</math>; and
+3. When the abundance class is intermediate, <math>0 < x < 6</math>.
+
 If the population is extinct, then it stays extinct, so:
 
 {% highlight python %}
 ...
-new_state = convertStateToIndex(0, F)
+new_state = convert_state_to_index(0, F)
 prob[new_state] = 1
 ...
 {% endhighlight %}
@@ -217,7 +300,7 @@ transition_same = x
 transition_down = x - 1
 # If action 1 is taken, then the patch is burned so the population
 # abundance moves down a class.
-if a == 1:
+if a == ACTION_BURN:
     transition_same -= 1
     transition_down -= 1
 # transition probability that abundance stays the same
@@ -232,7 +315,7 @@ prob[new_state] = (1 - s) * (1 - r)
 When the population abundance is at an intermediate class, then the population can also move up a level.
 If the abundance is at class 1 before the transition, then moving down a class will make it extinct.
 If there is also a fire, then we need to make sure that the abundance class isn't set to `−1` (an undefined value), so there is a check to only decrement the class if it is greater than zero.
-In this case also, then `x_2` and `x_3` are equal, so the probabilities of these two states need to be summed:
+Also, in this case the `transition_same` and `transition_down` are the same state, so the probabilities of these need to be summed:
 
 {% highlight python %}
 ...
@@ -243,7 +326,7 @@ transition_up = x + 1
 transition_down = x - 1
 # If action 1 is taken, then the patch is burned so the population
 # abundance moves down a class.
-if a == 1:
+if a == ACTION_BURN:
     transition_same -= 1
     transition_up -= 1
     # Ensure that the abundance class doesn't go to -1
@@ -273,49 +356,37 @@ def get_transition_probabilities(s, x, F, a):
     Parameters
     ----------
     s : float
-        The probability of a population remaining in its current abundance
-        class
+        The class-independent probability of the population staying in its
+        current population abundance class.
     x : int
-        The population abundance class
+        The population abundance class of the threatened species.
     F : int
-        The number of years since a fire
+        The time in years since last fire.
     a : int
-        The action to be performed
+        The action undertaken.
 
     Returns
     -------
     prob : array
-        The transition probabilities as a vector from state (x, F) to every
-        other state given action ``a`` is performed.
+        The transition probabilities as a vector from state (``x``, ``F``) to
+        every other state given that action ``a`` is taken.
 
     """
-
-    assert 0 <= x < POPULATION_CLASSES, \
-        "x not in {0, 1, …, %d}, x = %s" % (POPULATION_CLASSES - 1, str(x))
-    assert 0 <= F < FIRE_CLASSES, \
-        "F not in {0, 1, …, %d}, f = %s" % (FIRE_CLASSES - 1, str(F))
-    assert 0 <= s <= 1, "s not in [0, 1], s = %s" % str(s)
-    assert 0 <= a < ACTIONS, \
-        "a not in {0, 1, …, %d}, a = %s" % (ACTIONS - 1, str(a))
+    # Check that input is in range
+    check_probability(s)
+    check_population_class(x)
+    check_fire_class(F)
+    check_action(a)
 
     # a vector to store the transition probabilities
     prob = np.zeros(STATES)
+
     # the habitat suitability value
     r = get_habitat_suitability(F)
-
-    ## Efect of action on time in years since fire.
-    if a == 0:
-        # Increase the time since the patch has been burned by one year.
-        # The years since fire in patch is absorbed into the last class
-        if F < FIRE_CLASSES - 1:
-            F += 1
-    elif a == 1:
-        # When the patch is burned set the years since fire to 0.
-        F = 0
+    F = transition_fire_state(F, a)
 
     ## Population transitions
     if x == 0:
-        # Demographic model probabilities
         # population abundance class stays at 0 (extinct)
         new_state = convert_state_to_index(0, F)
         prob[new_state] = 1
@@ -326,15 +397,15 @@ def get_transition_probabilities(s, x, F, a):
         transition_down = x - 1
         # If action 1 is taken, then the patch is burned so the population
         # abundance moves down a class.
-        if a == 1:
+        if a == ACTION_BURN:
             transition_same -= 1
             transition_down -= 1
         # transition probability that abundance stays the same
         new_state = convert_state_to_index(transition_same, F)
-        prob[new_state] = 1 - (1 - s) * (1 - r)
+        prob[new_state] = 1 - (1 - s)*(1 - r)
         # transition probability that abundance goes down
         new_state = convert_state_to_index(transition_down, F)
-        prob[new_state] = (1 - s) * (1 - r)
+        prob[new_state] = (1 - s)*(1 - r)
     else:
         # Population abundance class can stay the same, transition up, or
         # transition down.
@@ -343,7 +414,7 @@ def get_transition_probabilities(s, x, F, a):
         transition_down = x - 1
         # If action 1 is taken, then the patch is burned so the population
         # abundance moves down a class.
-        if a == 1:
+        if a == ACTION_BURN:
             transition_same -= 1
             transition_up -= 1
             # Ensure that the abundance class doesn't go to -1
@@ -354,13 +425,13 @@ def get_transition_probabilities(s, x, F, a):
         prob[new_state] = s
         # transition probability that abundance goes up
         new_state = convert_state_to_index(transition_up, F)
-        prob[new_state] = (1 - s) * r
+        prob[new_state] = (1 - s)*r
         # transition probability that abundance goes down
         new_state = convert_state_to_index(transition_down, F)
         # In the case when transition_down = 0 before the effect of an action
         # is applied, then the final state is going to be the same as that for
         # transition_same, so we need to add the probabilities together.
-        prob[new_state] += (1 - s) * (1 - r)
+        prob[new_state] += (1 - s)*(1 - r)
 
     # Make sure that the probabilities sum to one
     assert (prob.sum() - 1) < np.spacing(1)
@@ -369,18 +440,20 @@ def get_transition_probabilities(s, x, F, a):
 
 ### Reward vectors
 
-The other important part of an MDP that we haven't discussed yet is the rewards.
-The rewards depend on the state of the system.
-
-... simple example...
+Let us revisit rewards for a minute.
+We already know that rewards depend on the state of the system, and they can also depend on the action taken.
+A simple example similar to the transition example above is as follows:
 
 {% highlight python %}
 R = np.array([[ 5, 10],
               [-1,  2]])
 {% endhighlight %}
 
-Defind in [Possingham and Tuck (1997)][poss-tuck-97] to be zero if the population is extinct and one if the population is extant.
-Therefore the rewards can be defined as a vector of length <math>S</math> (which is one of the valid ways of specifying rewards to PyMDPtoolbox).
+There are two states and two actions.
+This time the actions are the columns and the states are the rows, so the reward for being in state `0` and taking action `1` is 10.
+
+Rewards are defind in [Possingham and Tuck (1997)][poss-tuck-97] to be zero if the population is extinct and one if the population is extant.
+Therefore the rewards only need be defined as a vector of length <math>S</math>.
 
 ### Putting it all together
 
@@ -409,26 +482,30 @@ def get_transition_and_reward_arrays(s):
         numpy array and R is a numpy vector of length ``S``.
 
     """
-    assert 0 <= s <= 1, "'s' must be between 0 and 1 not %f" % s
+    check_probability(s)
+
     # The transition probability array
-    P = np.zeros((ACTIONS, STATES, STATES))
+    transition = np.zeros((ACTIONS, STATES, STATES))
     # The reward vector
-    R = np.zeros(STATES)
+    reward = np.zeros(STATES)
     # Loop over all states
     for idx in range(STATES):
         # Get the state index as inputs to our functions
         x, F = convert_index_to_state(idx)
         # The reward for being in this state is 1 if the population is extant
         if x != 0:
-            R[idx] = 1
+            reward[idx] = 1
         # Loop over all actions
         for a in range(ACTIONS):
             # Assign the transition probabilities for this state, action pair
-            P[a][idx] = get_transition_probabilities(s, x, F, a)
-    return (P, R)
+            transition[a][idx] = get_transition_probabilities(s, x, F, a)
+
+    return (transition, reward)
 {% endhighlight %}
 
-What do the transition and reward arrays look like?...
+If you generate them like `P, R = get_transition_and_reward_arrays(0.5)` you will notice that `R` is a vector of length 91, and that `P` is an array with a shape `(2, 91, 91)`.
+`P[0]` is the matrix corresponding to the transition probabilities for doing nothing, and `P[1]` is the matrix of transition probabilities for buring the forest.
+You can verify that each row sums to one with `P.sum(2)`.
 
 ## Solving a Markov decision process
 
@@ -451,7 +528,7 @@ def solve_mdp():
 
     Returns
     -------
-    mdp : mdptoolbox.mdp.FiniteHorizon
+    sdp : mdptoolbox.mdp.FiniteHorizon
         The PyMDPtoolbox object that represents a finite horizon MDP. The
         optimal policy for each stage is accessed with mdp.policy, which is a
         numpy array with 50 columns (one for each stage).
@@ -463,10 +540,8 @@ def solve_mdp():
     return sdp
 {% endhighlight %}
 
-I have added a printing function that prints the policy as a table, which is replicated in the table below.
+We can add a printing function that prints the policy as a table.
 It shows for each population abundance, as the rows, and years since fire, as the columns, which action should be chosen.
-The forest patch should not be burned until the population is in the highest abundance class and the time since last fire is seven years.
-This strategy would result in a cycle of burning the forest at (6, 7) which will cause the state to move to (5, 0), then do no action as the state transitions through (6, 1), (6, 2)...(6, 7) and then burn again thereby restarting the cycle.
 
 {% highlight python %}
 def print_policy(policy):
@@ -516,10 +591,13 @@ Output:
   6| 0  0  0  0  0  0  0  1  1  1  1  1  1
 </pre>
 
+The forest patch should not be burned until the population is in the highest abundance class and the time since last fire is seven years.
+This strategy would result in a cycle of burning the forest at (6, 7) which will cause the state to move to (5, 0), then do no action as the state transitions through (6, 1), (6, 2)…(6, 7) and then burn again thereby restarting the cycle.
+
 [poss-tuck-97]: http://www.mssanz.org.au/MODSIM97/Vol%202/Possingham.pdf
 
 ### Reference
-> Possingham H    & Tuck G, 1997, ‘Application of stochastic
+Possingham H    & Tuck G, 1997, ‘Application of stochastic
 dynamic programming to optimal fire management of a spatially structured
 threatened species’, *MODSIM 1997*, vol. 2, pp. 813–817.
 
