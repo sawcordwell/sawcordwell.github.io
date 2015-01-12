@@ -128,6 +128,7 @@ blockquote {
 pre,
 code {
     font-size: 15px;
+    font-family: monospace;
     border: 1px solid $grey-color-light;
     border-radius: 3px;
     background-color: #eef;
@@ -215,4 +216,14 @@ dt {
 dd {
   margin-left: 8em;
   margin-bottom: $spacing-unit;
+}
+
+/**
+ * Variables
+ */
+var {
+  font-family: STIXGeneral, serif;
+  font-size: 1.2*$base-font-size;
+  font-style: italic;
+  line-height: 0%;
 }
