@@ -112,7 +112,6 @@ blockquote {
     border-left: 4px solid $grey-color-light;
     padding-left: $spacing-unit / 2;
     font-size: 18px;
-    letter-spacing: -1px;
     font-style: italic;
 
     > :last-child {
@@ -225,5 +224,24 @@ var {
   font-family: STIXGeneral, serif;
   font-size: 1.2*$base-font-size;
   font-style: italic;
-  line-height: 0%;
+  line-height: 0;
+}
+
+/**
+ * Tables
+ */
+table {
+    display: block;
+    width: 100%;
+    overflow: auto;
+}
+th, td {
+    padding: 7px;
+    border: 1px solid $grey-color-light;;
+}
+tr:nth-child(even) {
+    background: $grey-color-lightest;
+}
+tr:nth-child(odd) {
+    background: white;
 }
