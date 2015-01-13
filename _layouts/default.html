@@ -4,6 +4,11 @@
   {% include head.html %}
 
   <body itemscope itemtype="http://schema.org/Blog">
+    {% if page.mathjax %}
+    <script type="text/javascript"
+      src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config={{ page.mathjax }}">
+    </script>
+    {% endif %}
 
     {% include header.html %}
 
