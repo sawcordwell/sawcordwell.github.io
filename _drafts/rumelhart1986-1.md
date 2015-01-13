@@ -239,42 +239,46 @@ I recorded the number of iterations it took and the final cost.
 Here are some summary statistics:
 
 <table>
-  <tr>
-    <th></th>
-    <th>Minimum</th>
-    <th>First Quartile</th>
-    <th>Median</th>
-    <th>Third Quartile</th>
-    <th>Maximum</th>
-    <th>Mean</th>
-    <th>Standard Deviation</th>
-    <th>Skewness</th>
-    <th>Kurtosis</th>
-  </tr>
-  <tr>
-    <th>Iterations</th>
-    <td>333</td>
-    <td>1127</td>
-    <td>2715</td>
-    <td>7829.75</td>
-    <td>54770</td>
-    <td>5891.91</td>
-    <td>7325.30</td>
-    <td>2.28426</td>
-    <td>6.45080</td>
-  </tr>
-  <tr>
-    <th>Error</th>
-    <td>0.44754</td>
-    <td>1.63054</td>
-    <td>1.67648</td>
-    <td>1.70834</td>
-    <td>1.86460</td>
-    <td>1.59441</td>
-    <td>0.24843</td>
-    <td>-2.32282</td>
-    <td>4.22037</td>
-  </tr>
+  <thead>
+    <tr>
+      <th></th>
+      <th>Minimum</th>
+      <th>First Quartile</th>
+      <th>Median</th>
+      <th>Third Quartile</th>
+      <th>Maximum</th>
+      <th>Mean</th>
+      <th>Standard Deviation</th>
+      <th>Skewness</th>
+      <th>Kurtosis</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Iterations</th>
+      <td>333</td>
+      <td>1127</td>
+      <td>2715</td>
+      <td>7829.75</td>
+      <td>54770</td>
+      <td>5891.91</td>
+      <td>7325.30</td>
+      <td>2.28426</td>
+      <td>6.45080</td>
+    </tr>
+    <tr>
+      <th>Error</th>
+      <td>0.44754</td>
+      <td>1.63054</td>
+      <td>1.67648</td>
+      <td>1.70834</td>
+      <td>1.86460</td>
+      <td>1.59441</td>
+      <td>0.24843</td>
+      <td>-2.32282</td>
+      <td>4.22037</td>
+    </tr>
+  </tbody>
 </table>
 
 Finally, here is a diagram of the final weights for each layer of the network from a random sweep through the cases.
