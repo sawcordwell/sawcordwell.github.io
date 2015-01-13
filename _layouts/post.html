@@ -12,5 +12,7 @@ layout: default
   <article class="post-content" itemprop="articleBody">
     {{ content }}
   </article>
+  
+  {% if page.date-modified %}<p class="post-meta">Last modfied <time datetime="{{ page.date-modified | date: "%FT%T" }}" itemprop="dateModified">{{ page.date-modified | date: "%B %-d, %Y" }}</time>.</p>{% endif %}
 
 </div>
