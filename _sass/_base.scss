@@ -245,3 +245,13 @@ tr:nth-child(even) {
 tr:nth-child(odd) {
     background: white;
 }
+
+/*
+ * Print media
+ */
+
+@media print {
+    pre, code {
+        font-size: 13px;
+    }
+}
